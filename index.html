@@ -1,0 +1,1030 @@
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>WebRTC Multi-Device Walkie-Talkie Pro</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- PeerJS WebRTC Library -->
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <!-- Google Fonts & FontAwesome Icons -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800;900&family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+        }
+        .font-lcd {
+            font-family: 'Orbitron', monospace;
+        }
+        
+        /* Realistic Device Enclosure */
+        .device-body {
+            background: radial-gradient(circle at 50% 20%, #2b2f36 0%, #17191d 80%, #0d0e11 100%);
+            box-shadow: 
+                0 25px 50px -12px rgba(0, 0, 0, 0.85),
+                inset 0 1px 1px rgba(255, 255, 255, 0.15),
+                inset 0 -3px 8px rgba(0, 0, 0, 0.9);
+        }
+
+        .metal-bezel {
+            background: linear-gradient(145deg, #444b55, #1a1c20);
+            box-shadow: inset 0 2px 3px rgba(255, 255, 255, 0.2), 0 4px 10px rgba(0,0,0,0.5);
+        }
+
+        /* LCD Screen Glow Styles */
+        .lcd-screen-on {
+            background: radial-gradient(ellipse at center, #1a3c10 0%, #0a1f05 80%, #041002 100%);
+            border: 2px solid #285e19;
+            box-shadow: inset 0 0 15px rgba(50, 205, 50, 0.35), 0 0 12px rgba(50, 205, 50, 0.2);
+        }
+        .lcd-screen-off {
+            background: #0d130c;
+            border: 2px solid #1a2618;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.9);
+        }
+
+        /* PTT Tactile Button Styling */
+        .ptt-button {
+            background: linear-gradient(180deg, #e63946 0%, #b71c1c 80%, #800f0f 100%);
+            box-shadow: 
+                0 8px 0 #520808,
+                0 15px 20px rgba(0, 0, 0, 0.6),
+                inset 0 2px 2px rgba(255, 255, 255, 0.4);
+            transition: all 0.08s ease;
+        }
+        .ptt-button:active, .ptt-button.pressed {
+            transform: translateY(6px);
+            box-shadow: 
+                0 2px 0 #520808,
+                0 5px 10px rgba(0, 0, 0, 0.4),
+                inset 0 1px 1px rgba(255, 255, 255, 0.2);
+            background: linear-gradient(180deg, #d32f2f 0%, #9a0007 100%);
+        }
+
+        /* Ridge pattern on side grips */
+        .tactile-grip {
+            background-image: repeating-linear-gradient(
+                0deg,
+                transparent,
+                transparent 4px,
+                rgba(0, 0, 0, 0.5) 4px,
+                rgba(0, 0, 0, 0.5) 8px
+            );
+        }
+
+        /* Speaker Grille Slots */
+        .speaker-slot {
+            background: #000;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.9), 0 1px 0 rgba(255,255,255,0.08);
+        }
+
+        /* Glowing Status LEDs */
+        .led-tx {
+            background-color: #ef4444;
+            box-shadow: 0 0 12px #ef4444, 0 0 2px #ffffff;
+        }
+        .led-rx {
+            background-color: #22c55e;
+            box-shadow: 0 0 12px #22c55e, 0 0 2px #ffffff;
+        }
+        .led-off {
+            background-color: #374151;
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.8);
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex items-center justify-center p-2 sm:p-6 overflow-x-hidden">
+
+    <div class="relative w-full max-w-md mx-auto flex flex-col items-center">
+        
+        <!-- Top Antenna & Knobs -->
+        <div class="w-4/5 flex justify-between items-end px-6 z-0 -mb-2">
+            <!-- Antenna -->
+            <div class="flex flex-col items-center ml-4">
+                <div class="w-3.5 h-20 bg-gradient-to-r from-gray-800 via-gray-600 to-gray-900 rounded-t-sm shadow-md"></div>
+                <div class="w-5 h-8 bg-gradient-to-r from-gray-900 via-gray-700 to-black rounded-t-md border-b border-gray-900"></div>
+                <div class="w-7 h-4 bg-gray-900 rounded-t-sm"></div>
+            </div>
+
+            <!-- Rotary Channel Knob -->
+            <div class="flex flex-col items-center mr-2">
+                <span class="text-[10px] font-bold tracking-wider text-slate-400 mb-1 uppercase">Channel</span>
+                <div id="channelKnob" class="w-12 h-12 rounded-full metal-bezel flex items-center justify-center cursor-pointer transition-transform duration-200 relative shadow-lg">
+                    <div class="w-1.5 h-4 bg-orange-500 rounded-full absolute top-1 left-1/2 -translate-x-1/2"></div>
+                    <div class="w-8 h-8 rounded-full bg-slate-900 border border-slate-700 flex items-center justify-center">
+                        <i class="fa-solid fa-arrows-rotate text-xs text-slate-500"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Power / Volume Rotary Knob -->
+            <div class="flex flex-col items-center mr-4">
+                <span class="text-[10px] font-bold tracking-wider text-slate-400 mb-1 uppercase">Vol / Power</span>
+                <div id="volumeKnob" class="w-14 h-14 rounded-full metal-bezel flex items-center justify-center cursor-pointer transition-transform duration-200 relative shadow-lg">
+                    <div id="knobIndicator" class="w-1.5 h-4 bg-emerald-500 rounded-full absolute top-1 left-1/2 -translate-x-1/2"></div>
+                    <div class="w-9 h-9 rounded-full bg-slate-900 border border-slate-700 flex items-center justify-center">
+                        <i class="fa-solid fa-power-off text-xs text-slate-600" id="powerIcon"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="device-body w-full rounded-[40px] border-2 border-slate-700/50 p-5 sm:p-6 flex flex-col items-center relative z-10 shadow-2xl">
+            
+            <!-- Side Grips -->
+            <div class="absolute left-0 top-24 bottom-24 w-2.5 tactile-grip rounded-r-md border-r border-slate-700/40"></div>
+            <div class="absolute right-0 top-24 bottom-24 w-2.5 tactile-grip rounded-l-md border-l border-slate-700/40"></div>
+
+            <!-- Header Brand & Status LEDs -->
+            <div class="w-full flex justify-between items-center mb-4 px-2">
+                <div class="flex items-center space-x-2">
+                    <div class="w-3 h-3 rounded-full bg-amber-500/80 border border-amber-300 animate-pulse"></div>
+                    <span class="text-xs font-bold tracking-widest text-slate-400 uppercase">PEER-TALK <span class="text-orange-500 text-[10px]">WEBRTC</span></span>
+                </div>
+                
+                <!-- Status LEDs (TX / RX) -->
+                <div class="flex items-center space-x-4 bg-slate-900/80 px-3 py-1.5 rounded-full border border-slate-800">
+                    <div class="flex items-center space-x-1.5">
+                        <div id="txLed" class="w-2.5 h-2.5 rounded-full led-off"></div>
+                        <span class="text-[9px] font-bold tracking-wider text-slate-400">TX</span>
+                    </div>
+                    <div class="flex items-center space-x-1.5">
+                        <div id="rxLed" class="w-2.5 h-2.5 rounded-full led-off"></div>
+                        <span class="text-[9px] font-bold tracking-wider text-slate-400">RX</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- DIGITAL LCD SCREEN -->
+            <div id="lcdContainer" class="w-full rounded-2xl p-4 mb-4 transition-all duration-300 lcd-screen-off flex flex-col justify-between h-48 relative overflow-hidden">
+                <!-- Screen Glass Reflection -->
+                <div class="absolute top-0 right-0 w-full h-full bg-gradient-to-bl from-white/5 via-transparent to-transparent pointer-events-none"></div>
+
+                <!-- LCD Header Bar -->
+                <div id="lcdHeader" class="flex justify-between items-center text-emerald-900 opacity-40 font-lcd text-xs">
+                    <div class="flex items-center space-x-1">
+                        <i id="signalIcon" class="fa-solid fa-signal text-xs"></i>
+                        <span id="signalText" class="text-[10px] font-bold">READY</span>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <span id="channelName" class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-950/50">CH-01</span>
+                        <i class="fa-solid fa-wifi text-xs"></i>
+                    </div>
+                </div>
+
+                <!-- LCD Main Display: Room ID & Frequency -->
+                <div class="flex justify-between items-baseline my-1">
+                    <div>
+                        <span class="text-[10px] font-lcd text-emerald-900 opacity-40 uppercase block">MY PHONE ID / CODE</span>
+                        <div class="flex items-baseline">
+                            <span id="lcdMyId" class="text-3xl font-lcd font-extrabold text-emerald-950 transition-colors">----</span>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <span class="text-[10px] font-lcd text-emerald-900 opacity-40 uppercase block">TARGET ID</span>
+                        <span id="lcdTargetId" class="text-lg font-lcd font-bold text-emerald-950">NONE</span>
+                    </div>
+                </div>
+
+                <!-- LCD Canvas Audio Wave Visualizer -->
+                <div class="w-full h-10 relative flex items-center justify-center">
+                    <canvas id="visualizerCanvas" class="w-full h-full block rounded"></canvas>
+                    <div id="lcdOffMessage" class="absolute inset-0 flex items-center justify-center text-slate-700 font-lcd text-xs tracking-widest uppercase">
+                        POWER OFF
+                    </div>
+                </div>
+
+                <!-- LCD Footer Status Bar -->
+                <div class="flex justify-between items-center text-[10px] font-lcd border-t border-emerald-900/30 pt-1">
+                    <span id="statusText" class="text-emerald-950 font-bold uppercase tracking-wider">SYSTEM OFF</span>
+                    <span id="banglaStatus" class="text-emerald-950 text-[11px] font-semibold">বন্ধ আছে</span>
+                </div>
+            </div>
+
+            <!-- WEBRTC CONNECT / PAIRING BOX -->
+            <div id="pairingContainer" class="w-full bg-slate-900/90 rounded-xl p-3 mb-4 border border-slate-800 flex flex-col space-y-2 opacity-50 pointer-events-none transition-all">
+                <div class="flex items-center justify-between text-xs text-slate-300 font-semibold">
+                    <span><i class="fa-solid fa-link text-orange-400 mr-1"></i> ২য় ফোন কানেক্ট করুন:</span>
+                    <span class="text-[10px] text-slate-400">৪ ডিজিটের কোড দিন</span>
+                </div>
+                <div class="flex space-x-2">
+                    <input type="number" id="targetIdInput" placeholder="2nd Phone ID (e.g. 4821)" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white placeholder-slate-500 font-lcd focus:outline-none focus:border-orange-500">
+                    <button id="btnConnect" class="bg-orange-600 hover:bg-orange-500 active:bg-orange-700 text-white font-bold text-xs px-4 py-1.5 rounded-lg transition shadow flex items-center shrink-0">
+                        <i class="fa-solid fa-plug mr-1"></i> CONNECT
+                    </button>
+                </div>
+            </div>
+
+            <!-- MIDDLE CONTROL BUTTONS -->
+            <div class="w-full grid grid-cols-4 gap-2 mb-4">
+                <button id="btnPrevCh" class="bg-slate-800 hover:bg-slate-700 active:bg-slate-900 border border-slate-600/50 text-slate-200 py-2 rounded-xl text-xs font-bold flex flex-col items-center justify-center transition shadow">
+                    <i class="fa-solid fa-chevron-left mb-1 text-slate-400"></i>
+                    <span class="text-[8px] text-slate-400">CH -</span>
+                </button>
+
+                <button id="btnNextCh" class="bg-slate-800 hover:bg-slate-700 active:bg-slate-900 border border-slate-600/50 text-slate-200 py-2 rounded-xl text-xs font-bold flex flex-col items-center justify-center transition shadow">
+                    <i class="fa-solid fa-chevron-right mb-1 text-slate-400"></i>
+                    <span class="text-[8px] text-slate-400">CH +</span>
+                </button>
+
+                <button id="btnStatic" class="bg-slate-800 hover:bg-slate-700 active:bg-slate-900 border border-slate-600/50 text-slate-200 py-2 rounded-xl text-xs font-bold flex flex-col items-center justify-center transition shadow">
+                    <i class="fa-solid fa-headphone-simple mb-1 text-amber-400"></i>
+                    <span class="text-[8px] text-slate-400">SQL/MON</span>
+                </button>
+
+                <button id="btnCall" class="bg-amber-600 hover:bg-amber-500 active:bg-amber-700 border border-amber-500/50 text-white py-2 rounded-xl text-xs font-bold flex flex-col items-center justify-center transition shadow">
+                    <i class="fa-solid fa-bell mb-1"></i>
+                    <span class="text-[8px] text-amber-200">CALL TONE</span>
+                </button>
+            </div>
+
+            <!-- PTT BUTTON -->
+            <div class="w-full flex flex-col items-center my-1 relative">
+                <div class="text-[9px] font-bold text-slate-400 tracking-wider mb-2 flex items-center space-x-1">
+                    <span class="bg-slate-800 px-2 py-0.5 rounded text-slate-300">HOLD SPACEBAR OR BUTTON</span>
+                </div>
+
+                <button id="pttButton" class="ptt-button w-44 h-44 rounded-full border-4 border-slate-900 flex flex-col items-center justify-center cursor-pointer select-none text-white relative group overflow-hidden">
+                    <div class="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent pointer-events-none"></div>
+                    <i class="fa-solid fa-microphone text-4xl mb-1.5 drop-shadow-md group-hover:scale-110 transition-transform"></i>
+                    <span class="font-black text-lg tracking-wider text-amber-100 drop-shadow">PUSH TO TALK</span>
+                    <span class="text-[10px] font-bold tracking-widest text-red-200 opacity-90 mt-0.5">কথা বলতে চাপুন</span>
+                </button>
+
+                <!-- PTT Mode Switch -->
+                <div class="mt-3 flex items-center space-x-3 bg-slate-900/90 px-3.5 py-1.5 rounded-full border border-slate-800">
+                    <span class="text-[11px] text-slate-400 font-medium">PTT Mode:</span>
+                    <label class="inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="pttModeToggle" class="sr-only peer">
+                        <div class="w-8 h-4 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-orange-600 relative"></div>
+                        <span id="pttModeLabel" class="ml-2 text-[11px] font-semibold text-slate-300">Hold</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- SPEAKER GRILLE -->
+            <div class="w-full mt-3 flex flex-col items-center">
+                <div class="w-4/5 flex flex-col items-center space-y-1.5 py-2.5 px-6 bg-slate-900/60 rounded-2xl border border-slate-800/80">
+                    <div class="w-full h-1.5 rounded-full speaker-slot"></div>
+                    <div class="w-11/12 h-1.5 rounded-full speaker-slot"></div>
+                    <div class="w-4/5 h-1.5 rounded-full speaker-slot"></div>
+                    <div class="w-2/3 h-1.5 rounded-full speaker-slot"></div>
+                </div>
+
+                <!-- Mic Hole -->
+                <div class="flex items-center space-x-1.5 mt-2">
+                    <div class="w-2 h-2 rounded-full bg-black border border-slate-700 shadow-inner"></div>
+                    <span class="text-[8px] font-extrabold tracking-widest text-slate-500 uppercase">MIC</span>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Hidden Audio tag for WebRTC Remote Stream -->
+        <audio id="remoteAudio" autoplay class="hidden"></audio>
+
+        <!-- Volume Badge Overlay -->
+        <div id="volBadge" class="absolute -bottom-8 bg-slate-800/90 text-amber-400 text-xs px-3 py-1 rounded-full border border-slate-700 shadow-md transition-opacity opacity-0 pointer-events-none">
+            Volume: <span id="volVal">80%</span>
+        </div>
+    </div>
+
+    <script>
+        // Frequency Channels Data
+        const CHANNELS = [
+            { id: 1, name: "CH-01", freq: "446.006" },
+            { id: 2, name: "CH-02", freq: "446.018" },
+            { id: 3, name: "CH-03", freq: "446.031" },
+            { id: 4, name: "CH-04", freq: "446.043" },
+            { id: 5, name: "CH-05", freq: "446.056" },
+            { id: 6, name: "CH-06", freq: "446.068" },
+            { id: 7, name: "CH-07", freq: "446.081" },
+            { id: 8, name: "CH-08", freq: "446.093" }
+        ];
+
+        // System State Variables
+        let isPowerOn = false;
+        let currentChannelIdx = 0;
+        let volumeLevel = 0.8;
+        let isTransmitting = false;
+        let isReceiving = false;
+        let isSquelchOpen = false;
+        let pttToggleMode = false;
+
+        // PeerJS & WebRTC Variables
+        let myPeer = null;
+        let myPeerId = null;
+        let activeCall = null;
+        let activeDataConn = null;
+        let localMicStream = null;
+        let remoteAudioStream = null;
+
+        // Audio Context & Web Audio Synth Nodes
+        let audioCtx = null;
+        let masterGainNode = null;
+        let analyserNode = null;
+        let staticNoiseNode = null;
+        let staticGainNode = null;
+
+        // Animation Frame
+        let animFrameId = null;
+
+        // DOM Elements
+        const lcdContainer = document.getElementById('lcdContainer');
+        const lcdHeader = document.getElementById('lcdHeader');
+        const lcdMyId = document.getElementById('lcdMyId');
+        const lcdTargetId = document.getElementById('lcdTargetId');
+        const channelName = document.getElementById('channelName');
+        const statusText = document.getElementById('statusText');
+        const banglaStatus = document.getElementById('banglaStatus');
+        const lcdOffMessage = document.getElementById('lcdOffMessage');
+        const signalText = document.getElementById('signalText');
+        const txLed = document.getElementById('txLed');
+        const rxLed = document.getElementById('rxLed');
+        const pttButton = document.getElementById('pttButton');
+        const volumeKnob = document.getElementById('volumeKnob');
+        const knobIndicator = document.getElementById('knobIndicator');
+        const powerIcon = document.getElementById('powerIcon');
+        const channelKnob = document.getElementById('channelKnob');
+        const pairingContainer = document.getElementById('pairingContainer');
+        const targetIdInput = document.getElementById('targetIdInput');
+        const btnConnect = document.getElementById('btnConnect');
+        const remoteAudio = document.getElementById('remoteAudio');
+        const visualizerCanvas = document.getElementById('visualizerCanvas');
+        const canvasCtx = visualizerCanvas.getContext('2d');
+        const volBadge = document.getElementById('volBadge');
+        const volVal = document.getElementById('volVal');
+
+        // Control Buttons
+        const btnPrevCh = document.getElementById('btnPrevCh');
+        const btnNextCh = document.getElementById('btnNextCh');
+        const btnStatic = document.getElementById('btnStatic');
+        const btnCall = document.getElementById('btnCall');
+        const pttModeToggle = document.getElementById('pttModeToggle');
+        const pttModeLabel = document.getElementById('pttModeLabel');
+
+        /**
+         * Initialize Web Audio Context
+         */
+        function initAudioContext() {
+            if (!audioCtx) {
+                const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+                audioCtx = new AudioContextClass();
+                
+                masterGainNode = audioCtx.createGain();
+                masterGainNode.gain.setValueAtTime(volumeLevel, audioCtx.currentTime);
+                masterGainNode.connect(audioCtx.destination);
+
+                analyserNode = audioCtx.createAnalyser();
+                analyserNode.fftSize = 128;
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        /**
+         * Synthesize Button Click Tone
+         */
+        function playClickSound() {
+            if (!isPowerOn || !audioCtx) return;
+            try {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(120, audioCtx.currentTime + 0.03);
+                
+                gain.gain.setValueAtTime(0.3 * volumeLevel, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.03);
+
+                osc.connect(gain);
+                gain.connect(masterGainNode);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.03);
+            } catch(e) {}
+        }
+
+        /**
+         * Synthesize Walkie-Talkie Roger Beeps
+         */
+        function playPttBeep(isStart) {
+            if (!isPowerOn || !audioCtx) return;
+            try {
+                const now = audioCtx.currentTime;
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'triangle';
+
+                if (isStart) {
+                    osc.frequency.setValueAtTime(1200, now);
+                    osc.frequency.setValueAtTime(1600, now + 0.05);
+                    gain.gain.setValueAtTime(0.25 * volumeLevel, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+                    osc.connect(gain);
+                    gain.connect(masterGainNode);
+                    osc.start(now);
+                    osc.stop(now + 0.1);
+                } else {
+                    // Double tone roger beep
+                    osc.frequency.setValueAtTime(1800, now);
+                    osc.frequency.setValueAtTime(1200, now + 0.08);
+                    gain.gain.setValueAtTime(0.3 * volumeLevel, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.18);
+                    osc.connect(gain);
+                    gain.connect(masterGainNode);
+                    osc.start(now);
+                    osc.stop(now + 0.18);
+                }
+            } catch(e) {}
+        }
+
+        /**
+         * Synthesize Call Alert Ringing Tone
+         */
+        function playCallTone() {
+            if (!isPowerOn || !audioCtx) return;
+            try {
+                const now = audioCtx.currentTime;
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'sawtooth';
+                
+                osc.frequency.setValueAtTime(1050, now);
+                osc.frequency.setValueAtTime(1400, now + 0.1);
+                osc.frequency.setValueAtTime(1050, now + 0.2);
+                osc.frequency.setValueAtTime(1400, now + 0.3);
+
+                gain.gain.setValueAtTime(0.35 * volumeLevel, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.45);
+
+                osc.connect(gain);
+                gain.connect(masterGainNode);
+                osc.start(now);
+                osc.stop(now + 0.45);
+            } catch(e) {}
+        }
+
+        /**
+         * Synthesize Radio Static Squelch Noise
+         */
+        function setStaticNoise(enable, intensity = 0.08) {
+            if (!audioCtx) return;
+
+            if (enable && isPowerOn) {
+                if (staticNoiseNode) return;
+
+                const bufferSize = audioCtx.sampleRate * 2;
+                const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+                const data = buffer.getChannelData(0);
+
+                for (let i = 0; i < bufferSize; i++) {
+                    data[i] = (Math.random() * 2 - 1) * 0.5;
+                }
+
+                staticNoiseNode = audioCtx.createBufferSource();
+                staticNoiseNode.buffer = buffer;
+                staticNoiseNode.loop = true;
+
+                const filter = audioCtx.createBiquadFilter();
+                filter.type = 'bandpass';
+                filter.frequency.value = 1800;
+                filter.Q.value = 1.2;
+
+                staticGainNode = audioCtx.createGain();
+                staticGainNode.gain.setValueAtTime(intensity * volumeLevel, audioCtx.currentTime);
+
+                staticNoiseNode.connect(filter);
+                filter.connect(staticGainNode);
+                staticGainNode.connect(masterGainNode);
+
+                staticNoiseNode.start();
+            } else {
+                if (staticNoiseNode) {
+                    try {
+                        staticGainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.05);
+                        setTimeout(() => {
+                            if (staticNoiseNode) {
+                                staticNoiseNode.stop();
+                                staticNoiseNode.disconnect();
+                                staticNoiseNode = null;
+                                staticGainNode = null;
+                            }
+                        }, 60);
+                    } catch(e) {
+                        staticNoiseNode = null;
+                    }
+                }
+            }
+        }
+
+        /**
+         * Initialize PeerJS Server Connection and generate 4-digit ID
+         */
+        function initPeerJS() {
+            // Generate simple 4-digit code (1000 - 9999)
+            const shortId = Math.floor(1000 + Math.random() * 9000).toString();
+            myPeerId = shortId;
+            
+            lcdMyId.innerText = myPeerId;
+            statusText.innerText = "CONNECTING PEER...";
+            banglaStatus.innerText = "সার্ভারে যুক্ত হচ্ছে...";
+
+            // Create Peer instance
+            myPeer = new Peer(myPeerId, {
+                debug: 1
+            });
+
+            myPeer.on('open', (id) => {
+                myPeerId = id;
+                lcdMyId.innerText = myPeerId;
+                statusText.innerText = "READY - ONLINE";
+                banglaStatus.innerText = "অনলাইন প্রস্তুত";
+                signalText.innerText = "NET OK";
+            });
+
+            // Handle Incoming Data Connections
+            myPeer.on('connection', (conn) => {
+                activeDataConn = conn;
+                setupDataConnectionHandlers(conn);
+            });
+
+            // Handle Incoming Media Voice Calls
+            myPeer.on('call', async (call) => {
+                activeCall = call;
+                lcdTargetId.innerText = call.peer;
+                
+                // Answer call with local silent stream initially
+                const stream = await getLocalMicStream();
+                call.answer(stream);
+
+                call.on('stream', (remoteStream) => {
+                    remoteAudioStream = remoteStream;
+                    remoteAudio.srcObject = remoteStream;
+
+                    // Attach Remote Stream to Analyzer for Visualizer
+                    if (audioCtx) {
+                        const remoteSource = audioCtx.createMediaStreamSource(remoteStream);
+                        remoteSource.connect(analyserNode);
+                    }
+                });
+
+                call.on('close', () => {
+                    resetConnectionState();
+                });
+            });
+
+            myPeer.on('error', (err) => {
+                console.error("PeerJS Error:", err);
+                statusText.innerText = "PEER ERROR";
+                banglaStatus.innerText = "কানেকশন ত্রুটি";
+            });
+        }
+
+        /**
+         * Setup Data Channel Event Handlers (TX Signal, Beeps, Call Tones)
+         */
+        function setupDataConnectionHandlers(conn) {
+            conn.on('open', () => {
+                lcdTargetId.innerText = conn.peer;
+                statusText.innerText = `CONNECTED: ${conn.peer}`;
+                banglaStatus.innerText = `${conn.peer} যুক্ত হয়েছে`;
+                playPttBeep(true);
+            });
+
+            conn.on('data', (data) => {
+                if (data.type === 'TALK_START') {
+                    isReceiving = true;
+                    rxLed.className = 'w-2.5 h-2.5 rounded-full led-rx';
+                    statusText.innerText = `INCOMING TRANSMISSION...`;
+                    banglaStatus.innerText = `কথা শুনছেন...`;
+                    playPttBeep(true);
+                    setStaticNoise(true, 0.03);
+                } else if (data.type === 'TALK_STOP') {
+                    isReceiving = false;
+                    rxLed.className = 'w-2.5 h-2.5 rounded-full led-off';
+                    statusText.innerText = `READY - CH 0${CHANNELS[currentChannelIdx].id}`;
+                    banglaStatus.innerText = `চ্যানেল প্রস্তুত`;
+                    playPttBeep(false);
+                    setStaticNoise(false);
+                } else if (data.type === 'CALL_TONE') {
+                    playCallTone();
+                    statusText.innerText = `CALL ALERT FROM ${conn.peer}`;
+                    banglaStatus.innerText = `কল সতর্কতা এসেছে`;
+                }
+            });
+
+            conn.on('close', () => {
+                resetConnectionState();
+            });
+        }
+
+        /**
+         * Connect to Remote Peer Device by ID
+         */
+        async function connectToPeer(remoteId) {
+            if (!myPeer || !isPowerOn) return;
+            
+            statusText.innerText = `CALLING ${remoteId}...`;
+            banglaStatus.innerText = `কল করা হচ্ছে...`;
+
+            // Data Connection
+            activeDataConn = myPeer.connect(remoteId);
+            setupDataConnectionHandlers(activeDataConn);
+
+            // Media Call Connection
+            const stream = await getLocalMicStream();
+            activeCall = myPeer.call(remoteId, stream);
+            lcdTargetId.innerText = remoteId;
+
+            activeCall.on('stream', (remoteStream) => {
+                remoteAudioStream = remoteStream;
+                remoteAudio.srcObject = remoteStream;
+
+                if (audioCtx) {
+                    const remoteSource = audioCtx.createMediaStreamSource(remoteStream);
+                    remoteSource.connect(analyserNode);
+                }
+            });
+
+            activeCall.on('close', () => {
+                resetConnectionState();
+            });
+        }
+
+        /**
+         * Get Local Microphone Audio Stream
+         */
+        async function getLocalMicStream() {
+            if (localMicStream) return localMicStream;
+            try {
+                localMicStream = await navigator.mediaDevices.getUserMedia({ 
+                    audio: { 
+                        echoCancellation: true, 
+                        noiseSuppression: true, 
+                        autoGainControl: true 
+                    } 
+                });
+                // Mute mic by default until PTT is held
+                localMicStream.getAudioTracks().forEach(track => track.enabled = false);
+                return localMicStream;
+            } catch (err) {
+                console.error("Mic Access Error:", err);
+                statusText.innerText = "MIC PERMISSION DENIED";
+                banglaStatus.innerText = "মাইক পারমিশন দিন";
+                return null;
+            }
+        }
+
+        /**
+         * Reset Connection State
+         */
+        function resetConnectionState() {
+            lcdTargetId.innerText = "NONE";
+            statusText.innerText = `READY - ONLINE`;
+            banglaStatus.innerText = `অনলাইন প্রস্তুত`;
+            rxLed.className = 'w-2.5 h-2.5 rounded-full led-off';
+            txLed.className = 'w-2.5 h-2.5 rounded-full led-off';
+            setStaticNoise(false);
+            isReceiving = false;
+            isTransmitting = false;
+        }
+
+        /**
+         * Draw Realtime Audio Waveform Visualizer
+         */
+        function drawVisualizer() {
+            if (!isPowerOn) {
+                canvasCtx.clearRect(0, 0, visualizerCanvas.width, visualizerCanvas.height);
+                return;
+            }
+
+            animFrameId = requestAnimationFrame(drawVisualizer);
+
+            const width = visualizerCanvas.width;
+            const height = visualizerCanvas.height;
+            canvasCtx.clearRect(0, 0, width, height);
+
+            if ((isTransmitting || isReceiving) && analyserNode) {
+                // Live Voice Waveform
+                const bufferLength = analyserNode.frequencyBinCount;
+                const dataArray = new Uint8Array(bufferLength);
+                analyserNode.getByteTimeDomainData(dataArray);
+
+                canvasCtx.lineWidth = 2;
+                canvasCtx.strokeStyle = isTransmitting ? '#ef4444' : '#4ade80';
+                canvasCtx.beginPath();
+
+                const sliceWidth = width * 1.0 / bufferLength;
+                let x = 0;
+
+                for (let i = 0; i < bufferLength; i++) {
+                    const v = dataArray[i] / 128.0;
+                    const y = (v * height) / 2;
+
+                    if (i === 0) canvasCtx.moveTo(x, y);
+                    else canvasCtx.lineTo(x, y);
+
+                    x += sliceWidth;
+                }
+                canvasCtx.lineTo(width, height / 2);
+                canvasCtx.stroke();
+
+            } else if (isSquelchOpen) {
+                // Static Noise Equalizer Bars
+                canvasCtx.fillStyle = '#facc15';
+                const barWidth = 6;
+                let posX = 4;
+                while (posX < width) {
+                    const randomHeight = Math.random() * (height - 4);
+                    canvasCtx.fillRect(posX, (height - randomHeight) / 2, barWidth - 2, randomHeight);
+                    posX += barWidth;
+                }
+            } else {
+                // Idle Sine Wave
+                canvasCtx.lineWidth = 1.5;
+                canvasCtx.strokeStyle = 'rgba(74, 222, 128, 0.4)';
+                canvasCtx.beginPath();
+                const time = Date.now() * 0.003;
+                for (let x = 0; x < width; x++) {
+                    const y = height / 2 + Math.sin(x * 0.05 + time) * 3;
+                    if (x === 0) canvasCtx.moveTo(x, y);
+                    else canvasCtx.lineTo(x, y);
+                }
+                canvasCtx.stroke();
+            }
+        }
+
+        /**
+         * Power Toggle Handler
+         */
+        function togglePower() {
+            initAudioContext();
+            isPowerOn = !isPowerOn;
+
+            if (isPowerOn) {
+                powerIcon.className = 'fa-solid fa-power-off text-xs text-emerald-400';
+                
+                lcdContainer.classList.remove('lcd-screen-off');
+                lcdContainer.classList.add('lcd-screen-on');
+                
+                lcdHeader.classList.remove('opacity-40');
+                lcdHeader.classList.add('opacity-100');
+
+                lcdMyId.className = 'text-3xl font-lcd font-extrabold text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.8)]';
+                lcdTargetId.className = 'text-lg font-lcd font-bold text-emerald-300';
+                statusText.className = 'text-emerald-400 font-bold uppercase tracking-wider';
+                banglaStatus.className = 'text-emerald-300 text-[11px] font-semibold';
+
+                lcdOffMessage.classList.add('hidden');
+                pairingContainer.classList.remove('opacity-50', 'pointer-events-none');
+
+                // Initialize WebRTC
+                initPeerJS();
+
+                visualizerCanvas.width = visualizerCanvas.offsetWidth;
+                visualizerCanvas.height = visualizerCanvas.offsetHeight;
+                drawVisualizer();
+
+            } else {
+                // Power Off
+                if (isTransmitting) stopTransmission();
+                if (myPeer) { myPeer.destroy(); myPeer = null; }
+
+                powerIcon.className = 'fa-solid fa-power-off text-xs text-slate-600';
+                lcdContainer.classList.remove('lcd-screen-on');
+                lcdContainer.classList.add('lcd-screen-off');
+
+                lcdHeader.classList.remove('opacity-100');
+                lcdHeader.classList.add('opacity-40');
+
+                lcdMyId.className = 'text-3xl font-lcd font-extrabold text-emerald-950 transition-colors';
+                lcdTargetId.className = 'text-lg font-lcd font-bold text-emerald-950';
+                statusText.className = 'text-emerald-950 font-bold uppercase tracking-wider';
+                banglaStatus.className = 'text-emerald-950 text-[11px] font-semibold';
+
+                lcdMyId.innerText = "----";
+                lcdTargetId.innerText = "NONE";
+                statusText.innerText = "SYSTEM OFF";
+                banglaStatus.innerText = "বন্ধ আছে";
+
+                lcdOffMessage.classList.remove('hidden');
+                pairingContainer.classList.add('opacity-50', 'pointer-events-none');
+
+                txLed.className = 'w-2.5 h-2.5 rounded-full led-off';
+                rxLed.className = 'w-2.5 h-2.5 rounded-full led-off';
+
+                if (animFrameId) cancelAnimationFrame(animFrameId);
+                canvasCtx.clearRect(0, 0, visualizerCanvas.width, visualizerCanvas.height);
+            }
+        }
+
+        /**
+         * Start Transmission (PTT Down)
+         */
+        async function startTransmission() {
+            if (!isPowerOn || isTransmitting) return;
+            initAudioContext();
+
+            const stream = await getLocalMicStream();
+            if (stream) {
+                // Enable Microphone Track for WebRTC call
+                stream.getAudioTracks().forEach(track => track.enabled = true);
+                
+                // Connect Local Mic to Visualizer Analyser
+                const micSource = audioCtx.createMediaStreamSource(stream);
+                micSource.connect(analyserNode);
+            }
+
+            isTransmitting = true;
+            pttButton.classList.add('pressed');
+            
+            txLed.className = 'w-2.5 h-2.5 rounded-full led-tx';
+            statusText.innerText = "TRANSMITTING...";
+            banglaStatus.innerText = "কথা বলছেন...";
+
+            playPttBeep(true);
+            setStaticNoise(true, 0.02);
+
+            // Send Signal over Data Channel to remote peer
+            if (activeDataConn && activeDataConn.open) {
+                activeDataConn.send({ type: 'TALK_START' });
+            }
+        }
+
+        /**
+         * Stop Transmission (PTT Up)
+         */
+        function stopTransmission() {
+            if (!isTransmitting) return;
+            isTransmitting = false;
+            pttButton.classList.remove('pressed');
+
+            if (localMicStream) {
+                // Mute Mic Track
+                localMicStream.getAudioTracks().forEach(track => track.enabled = false);
+            }
+
+            setStaticNoise(false);
+
+            if (isPowerOn) {
+                txLed.className = 'w-2.5 h-2.5 rounded-full led-off';
+                playPttBeep(false);
+
+                statusText.innerText = activeDataConn ? `CONNECTED` : `READY - ONLINE`;
+                banglaStatus.innerText = activeDataConn ? `সংযুক্ত আছে` : `অনলাইন প্রস্তুত`;
+            }
+
+            if (activeDataConn && activeDataConn.open) {
+                activeDataConn.send({ type: 'TALK_STOP' });
+            }
+        }
+
+        // Event Listeners for Power & Knobs
+        volumeKnob.addEventListener('click', () => {
+            togglePower();
+            playClickSound();
+        });
+
+        volumeKnob.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            initAudioContext();
+            
+            if (e.deltaY < 0) volumeLevel = Math.min(1.0, volumeLevel + 0.05);
+            else volumeLevel = Math.max(0.0, volumeLevel - 0.05);
+
+            if (masterGainNode) masterGainNode.gain.setValueAtTime(volumeLevel, audioCtx.currentTime);
+
+            const currentVolAngle = -120 + (volumeLevel * 240);
+            knobIndicator.style.transform = `translateX(-50%) rotate(${currentVolAngle}deg)`;
+
+            volVal.innerText = `${Math.round(volumeLevel * 100)}%`;
+            volBadge.classList.remove('opacity-0');
+            clearTimeout(window.volTimeout);
+            window.volTimeout = setTimeout(() => volBadge.classList.add('opacity-0'), 1200);
+        });
+
+        // Channel Knob Switch
+        channelKnob.addEventListener('click', () => {
+            if (!isPowerOn) return;
+            playClickSound();
+            currentChannelIdx = (currentChannelIdx + 1) % CHANNELS.length;
+            channelName.innerText = CHANNELS[currentChannelIdx].name;
+            const rotation = (currentChannelIdx / (CHANNELS.length - 1)) * 180 - 90;
+            channelKnob.style.transform = `rotate(${rotation}deg)`;
+        });
+
+        btnPrevCh.addEventListener('click', () => {
+            if (!isPowerOn) return;
+            playClickSound();
+            currentChannelIdx = (currentChannelIdx - 1 + CHANNELS.length) % CHANNELS.length;
+            channelName.innerText = CHANNELS[currentChannelIdx].name;
+        });
+
+        btnNextCh.addEventListener('click', () => {
+            if (!isPowerOn) return;
+            playClickSound();
+            currentChannelIdx = (currentChannelIdx + 1) % CHANNELS.length;
+            channelName.innerText = CHANNELS[currentChannelIdx].name;
+        });
+
+        // WebRTC Manual Pair Button
+        btnConnect.addEventListener('click', () => {
+            const targetId = targetIdInput.value.trim();
+            if (targetId && targetId !== myPeerId) {
+                connectToPeer(targetId);
+            }
+        });
+
+        // Call Tone & Squelch Controls
+        btnCall.addEventListener('click', () => {
+            if (!isPowerOn) return;
+            playCallTone();
+            if (activeDataConn && activeDataConn.open) {
+                activeDataConn.send({ type: 'CALL_TONE' });
+            }
+        });
+
+        btnStatic.addEventListener('click', () => {
+            if (!isPowerOn) return;
+            isSquelchOpen = !isSquelchOpen;
+            playClickSound();
+            if (isSquelchOpen) {
+                btnStatic.classList.add('bg-amber-600', 'text-white');
+                setStaticNoise(true, 0.15);
+            } else {
+                btnStatic.classList.remove('bg-amber-600', 'text-white');
+                setStaticNoise(false);
+            }
+        });
+
+        // PTT Toggle Mode
+        pttModeToggle.addEventListener('change', (e) => {
+            pttToggleMode = e.target.checked;
+            pttModeLabel.innerText = pttToggleMode ? "Toggle" : "Hold";
+            if (isTransmitting) stopTransmission();
+        });
+
+        // Touch & Mouse Events for PTT
+        pttButton.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            if (pttToggleMode) {
+                if (isTransmitting) stopTransmission();
+                else startTransmission();
+            } else {
+                startTransmission();
+            }
+        });
+
+        window.addEventListener('mouseup', () => {
+            if (!pttToggleMode && isTransmitting) stopTransmission();
+        });
+
+        pttButton.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (pttToggleMode) {
+                if (isTransmitting) stopTransmission();
+                else startTransmission();
+            } else {
+                startTransmission();
+            }
+        });
+
+        pttButton.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            if (!pttToggleMode && isTransmitting) stopTransmission();
+        });
+
+        // Spacebar PTT Shortcut
+        let isSpacePressed = false;
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Space' && !isSpacePressed && !e.repeat) {
+                isSpacePressed = true;
+                if (pttToggleMode) {
+                    if (isTransmitting) stopTransmission();
+                    else startTransmission();
+                } else {
+                    startTransmission();
+                }
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            if (e.code === 'Space') {
+                isSpacePressed = false;
+                if (!pttToggleMode && isTransmitting) stopTransmission();
+            }
+        });
+    </script>
+</body>
+</html>
+```
